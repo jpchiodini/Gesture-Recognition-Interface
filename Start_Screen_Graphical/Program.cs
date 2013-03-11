@@ -756,7 +756,7 @@ namespace Start_Screen_Graphical
             var form = new RenderForm ("Transparency");
             start_screen mycube = new start_screen(form);
             {
-
+                
                 MessagePump.Run(form, mycube.RenderFrame);
                 {
                     int hi = 1;
