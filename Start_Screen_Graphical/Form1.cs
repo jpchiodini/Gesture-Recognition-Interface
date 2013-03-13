@@ -6,14 +6,22 @@ using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
+using Events;
 
 namespace Start_Screen_Graphical
 {
     public partial class Form1 : Form
     {
+        public event PauseEvent press_pause;
+
+
         public Form1()
         {
             InitializeComponent();
         }
+
+        
+
+        
     }
 }

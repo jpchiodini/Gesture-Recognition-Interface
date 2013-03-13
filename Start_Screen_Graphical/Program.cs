@@ -1,4 +1,12 @@
-﻿using System;
+﻿//##########################################
+//Senior Design Start Screen Alpha
+//Author: John Chiodini
+//Email: chiodini@bu.edu
+//###########################################
+
+
+
+using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.Windows.Forms;
@@ -14,6 +22,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
+using Events;
 
 
 //need to figure out how to set up multiple constant buffers...
@@ -23,7 +32,6 @@ namespace Start_Screen_Graphical
     /// <cube Description>
     /// Cube creates the swap chain and sets up the blank form for rendering
     /// </summary>
-
     public class start_screen
     {
 
@@ -36,10 +44,8 @@ namespace Start_Screen_Graphical
         RenderTargetView renderTarget;
         BlendState enabled;
         List<Texture2D> textpack = new List<Texture2D>();
-        Form form;
-        //holds operations for new form...
-       
-        
+        Form form;        
+        bool pause = false;       
 
         /// <summary>
         /// Calls the initializers
@@ -50,23 +56,25 @@ namespace Start_Screen_Graphical
             this.form = form;
             InitializeD3D();
             initializeScene(form);
-        }
 
+        }
         /// <summary>
         /// Capture textures and call scene class
         /// </summary>
         /// <param name="form"></param>
         public void initializeScene(Form form)
         {
-            DeviceContext context = device.ImmediateContext;
-
-
-
-            //textpack.Add(cube);
-            //textpack.Add(screen);
+            DeviceContext context = device.ImmediateContext;            
             scene = new Scene(device, form, context);
+            scene.press_pause += new PauseEvent(pauseScreen);
+            
         }
+       
 
+        public void pauseScreen(object a, Pause_Form_Event e)
+        {
+            pause = e.pause;
+        }
         public void InitializeD3D()
         {
             
@@ -96,18 +104,20 @@ namespace Start_Screen_Graphical
 
 
         }
-
         public void RenderFrame()
         {
             
+
+            if (pause == false)
+            {
                 DeviceContext mycontext = device.ImmediateContext;
                 mycontext.ClearRenderTargetView(renderTarget, new Color4(1.0f, 1.0f, 1.0f));
-                scene.Draw(device.ImmediateContext, device, textpack, form);
+                scene.Draw(device.ImmediateContext, textpack, form);
                 mycontext.OutputMerger.BlendFactor = new Color4(0.0f, 0.0f, 0.0f, 0.0f);
                 swapChain.Present(0, PresentFlags.None);
+            }
            
         }
-
         public void InitState()
         {
             BlendStateDescription blendStateDesc = new BlendStateDescription()
@@ -126,7 +136,6 @@ namespace Start_Screen_Graphical
             blendStateDesc.RenderTargets[0].RenderTargetWriteMask = ColorWriteMaskFlags.All;
             enabled = BlendState.FromDescription(device, blendStateDesc);
         }
-
         private void ReleaseDXResources(object sender, FormClosingEventArgs e)
         {
             renderTarget.Dispose();
@@ -134,20 +143,16 @@ namespace Start_Screen_Graphical
             device.Dispose();
         }
     }
-
     /// <Scene Class Description>
     /// This Class Renders over the blank form created using Vertex,Index, and Const Buffers
     /// Matrix Multiplications allow the cube to take a location relative to the camera on screen as well as 
     /// Rotate and Scale
     /// </summary>
-
     public class Scene
     {
-
         /**-------------------------------
          * Struct Definitions
          *-----------------------------*/
-
         //holds vertices along with normals and textcoords
         struct myVertex
         {
@@ -161,7 +166,6 @@ namespace Start_Screen_Graphical
             Vector3 Normal;
             Vector2 UV;
         };
-
         //Struct defining Constant Buffer info for cube
         struct CBUFFER
         {
@@ -171,12 +175,9 @@ namespace Start_Screen_Graphical
             public Vector4 LightColor;
             public Vector4 AmbientColor;
         }
-
-
         /*######################
          *  Initializations
          *######################*/
-
         //View matrices
         //cube
         Matrix IdMat, mTranslate, mScale, myLook, matProjection, mRotate1;
@@ -190,6 +191,7 @@ namespace Start_Screen_Graphical
         //screen
         Matrix sRotateX, sRotateY, sRotateZ;
 
+        Device device;
         Buffer Cube, Screen;
         InputLayout layout;
         ShaderSignature inputSignature;
@@ -203,6 +205,9 @@ namespace Start_Screen_Graphical
         CBUFFER cbuffer, cbuffer1;
         BlendState enabled;
 
+        //event handler
+        public event PauseEvent press_pause;
+        public event ChangeFace change_face;        
 
         //#######################
         //offsets
@@ -213,34 +218,54 @@ namespace Start_Screen_Graphical
         public static float Cap1 = 0.0f;
         public static float width = 0.35f;
         public static float width1;
-
         public bool zoom = true;
+
+        //##############
+        //Other Variables
+        //##############
+        int currentFace = 0;
+
 
         public Scene(Device device, Form form, DeviceContext context)
         {
-            initTextures(device);
+            this.device = device;
+            initTextures();
             Initialize(form, context);
-            CreateCube(device);
-            createScreen(device);
-            CreateConstBuffer(device, context);
-            CubeIndexBuffer(device);
-            ScreenIndexBuffer(device);
-            BuildShaderInputLayout(device);
+            CreateCube();
+            createScreen();
+            CreateConstBuffer(context);
+            CubeIndexBuffer();
+            ScreenIndexBuffer();
+            BuildShaderInputLayout();
         }
 
-        private void initTextures(Device device)
+        public void getNewFace(object a, Update_Face_Event e)
+        {
+            String temp = e.file_extension;
+            //parse the string to take out the number...
+            String ext = temp.Substring(0, (temp.Length - 1));
+            String faceNum = temp.Substring(temp.Length - 1, 1);
+            int index = Convert.ToInt32(faceNum);
+            SRVlist[index] = ShaderResourceView.FromFile(device, ext);
+
+        }
+
+        private void initTextures(/*Device device*/)
         {
             //screen  
             SRVscreen = ShaderResourceView.FromFile(device, "C:\\Users\\jpchiodini\\Documents\\Visual Studio 2010\\Projects\\Senior_Design\\Start_Screen_Graphical\\images\\metallic.jpg");
 
-            //cube
-            SRV4 = ShaderResourceView.FromFile(device, "C:\\Users\\Public\\Pictures\\Sample Pictures\\yellow.jpg");
-            SRV1 = ShaderResourceView.FromFile(device, "C:\\Users\\Public\\Pictures\\Sample Pictures\\purple.jpg");
+            //top and bottom
             SRV2 = ShaderResourceView.FromFile(device, "C:\\Users\\Public\\Pictures\\Sample Pictures\\green.jpg");
             SRV3 = ShaderResourceView.FromFile(device, "C:\\Users\\Public\\Pictures\\Sample Pictures\\blue.jpg");
+
+            //side faces
+            SRV4 = ShaderResourceView.FromFile(device, "C:\\Users\\Public\\Pictures\\Sample Pictures\\yellow.jpg");
+            SRV1 = ShaderResourceView.FromFile(device, "C:\\Users\\Public\\Pictures\\Sample Pictures\\purple.jpg");
+            
             SRV = ShaderResourceView.FromFile(device, "C:\\Users\\Public\\Pictures\\Sample Pictures\\red.jpg");
             SRV5 = ShaderResourceView.FromFile(device, "C:\\Users\\Public\\Pictures\\Sample Pictures\\orange.jpg");
-
+            
             SRVlist.Add(SRV);
             SRVlist.Add(SRV1);
             SRVlist.Add(SRV2);
@@ -248,15 +273,12 @@ namespace Start_Screen_Graphical
             SRVlist.Add(SRV4);
             SRVlist.Add(SRV5);
         }
-
-
-        //initialize the cube matrices...
+        //initialize the cube matrices
         public void Initialize(Form form, DeviceContext context)
         {
             /*---------------------------------
              * Constant Buffer Initialization
              *---------------------------------*/
-
             //Identity matrix for later use
             //Set up translation matrix.
             //Set up rotation matrix, gets updated in Draw Method
@@ -289,13 +311,11 @@ namespace Start_Screen_Graphical
 
         }
 
-
-
         /// <summary>
         /// Sets up cube vertices
         /// </summary>
         /// <param name="device"></param>
-        public void CreateCube(Device device)
+        public void CreateCube()
         {
 
             //for transparent screen...
@@ -338,8 +358,7 @@ namespace Start_Screen_Graphical
             //vertex buffer
             Cube = new Buffer(device, vertices, size * 24 * 7, ResourceUsage.Dynamic, BindFlags.VertexBuffer, CpuAccessFlags.Write, ResourceOptionFlags.None, 0);
         }
-
-        public void createScreen(Device device)
+        public void createScreen()
         {
             //for transparent screen...
             int size = Marshal.SizeOf(typeof(myVertex));
@@ -356,8 +375,7 @@ namespace Start_Screen_Graphical
             Screen = new Buffer(device, vertices, size * 24, ResourceUsage.Dynamic, BindFlags.VertexBuffer, CpuAccessFlags.Write, ResourceOptionFlags.None, 0);
 
         }
-
-        public void CubeIndexBuffer(Device device)
+        public void CubeIndexBuffer()
         {
 
             int size = sizeof(uint);
@@ -382,7 +400,7 @@ namespace Start_Screen_Graphical
             indices.Position = 0;
             indexBuffer = new Buffer(device, indices, Marshal.SizeOf(typeof(uint)) * 42, ResourceUsage.Dynamic, BindFlags.IndexBuffer, CpuAccessFlags.Write, ResourceOptionFlags.None, 0); //*
         }
-        public void ScreenIndexBuffer(Device device)
+        public void ScreenIndexBuffer()
         {
             int size = sizeof(uint);
             uint[] OurIndices = 
@@ -396,10 +414,7 @@ namespace Start_Screen_Graphical
             screenIndexBuffer = new Buffer(device, indices, Marshal.SizeOf(typeof(uint)) * 6, ResourceUsage.Dynamic, BindFlags.IndexBuffer, CpuAccessFlags.Write, ResourceOptionFlags.None, 0);
 
         }
-
-
-
-        public void BuildShaderInputLayout(Device device)
+        public void BuildShaderInputLayout()
         {
 
             // load and compile the vertex shader
@@ -434,7 +449,7 @@ namespace Start_Screen_Graphical
         /// </summary>
         /// <param name="device"></param>
         /// <param name="context"></param>
-        public void CreateConstBuffer(Device device, DeviceContext context)
+        public void CreateConstBuffer(DeviceContext context)
         {
             context = device.ImmediateContext;
             int size = Marshal.SizeOf(typeof(CBUFFER));
@@ -471,7 +486,7 @@ namespace Start_Screen_Graphical
         /// <param name="context"></param>
         /// <param name="device"></param>
         /// <param name="textpack"></param>        
-        public void Draw(DeviceContext context, Device device, List<Texture2D> textpack, Form form)
+        public void Draw(DeviceContext context, List<Texture2D> textpack, Form form)
         {
             // configure the Input Assembler portion of the pipeline with the vertex data
             //set shaders and buffers                        
@@ -498,7 +513,7 @@ namespace Start_Screen_Graphical
                 //test to see how cube will face up
                 zoomCube(context,0.8f);
             }
-            drawCube(device, context, SRVlist);
+            drawCube(context, SRVlist);
 
             //enable blending
             context.OutputMerger.BlendState = enabled;
@@ -511,13 +526,13 @@ namespace Start_Screen_Graphical
             if (Cap >= 1.5f)
             {
                 updateScreen(context, 0.0f, 0.0f, 1.333f, 0.59f, 1.0f);
-                drawScreen(device, context, SRVscreen);
+                drawScreen(context, SRVscreen);
                 
             }
             if (Cap < 1.5f)
             {
                 updateScreen(context, 1.23f, 0.785f, 1.333f, 0.59f, 1.0f);
-                drawScreen(device, context, SRVscreen);
+                drawScreen(context, SRVscreen);
                 Cap += 0.0001f;
             }            
 
@@ -532,6 +547,8 @@ namespace Start_Screen_Graphical
        /// <param name="limit">how much to zoom in</param>
         public void zoomCube(DeviceContext context, float limit)
         {
+            
+
             if (Zoom < limit)
             {
                 //takes the current rotation value, and finds which side of the cube is being selected
@@ -544,20 +561,40 @@ namespace Start_Screen_Graphical
                 moveCamera(0.0f);
                 //position the cube
                 positionCube(context, 0.0f, cubepos[index] + 0.785f, 0.0f, Zoom, 0.0f, Zoom, true);
+                currentFace = index;
                 Zoom += 0.001f;
             }
                 //otherwise reset.. this is just for demo purposes
             else
             {
-                test_form testform = new test_form();                
+                //send a pause event.
+                press_pause(this, new Pause_Form_Event(true));
+
+                //open the selected face of the cube... will send events back to this class...
+                SubScreen_Handler SSH = new SubScreen_Handler(currentFace);
                 
-                testform.ShowDialog();
+                //get the command whether to pause or not
+                SSH.press_pause += new PauseEvent(getState);
+                SSH.change_face += new ChangeFace(getNewFace);
+                SSH.RenderForm();               
+               
+                //reset the original cube
                 Cap = 0.0f;
                 Zoom = 0.0f;
                 //reset camera to initial position
                 moveCamera(1.0f);
             }
+        }        
+        
 
+    /// <summary>
+    /// Receives an alert when its time for the system to wake back up
+    /// </summary>
+    /// <param name="a"></param>
+    /// <param name="e"></param>
+        public void getState(object a, Pause_Form_Event e)
+        {
+            press_pause(this, new Pause_Form_Event(e.pause));
         }
         public void InitState(Device device)
         {
@@ -577,9 +614,6 @@ namespace Start_Screen_Graphical
             blendStateDesc.RenderTargets[0].RenderTargetWriteMask = ColorWriteMaskFlags.All;
             enabled = BlendState.FromDescription(device, blendStateDesc);
         }
-
-
-
         /// <summary>
         /// Updates Matrices to change the position and rotation of home screen cube
         /// </summary>
@@ -629,7 +663,7 @@ namespace Start_Screen_Graphical
 
             matFinal = mRotateX * mRotateY * mRotateZ * mTranslate * myLook * matProjection;
             //matFinal = mRotateX * myLook * matProjection;
-            cbuffer.Rotatation = mRotateX;// *mRotateY * mRotateZ;
+            cbuffer.Rotatation = mRotateX;
             cbuffer.Final = matFinal;
             int size = Marshal.SizeOf(typeof(CBUFFER));
             var update = new DataStream(size, true, true);
@@ -703,14 +737,13 @@ namespace Start_Screen_Graphical
             //update vertices on gpu
             context.UpdateSubresource(new DataBox(0, 0, update), constantBuffer, 0);            
         }
-
         /// <summary>
         /// Draws cube using specified vertex and index buffers
         /// </summary>
         /// <param name="device"></param>
         /// <param name="context"></param>
         /// <param name="resourceView"></param>
-        private void drawCube(Device device, DeviceContext context, List<ShaderResourceView> SRVlist)
+        private void drawCube(DeviceContext context, List<ShaderResourceView> SRVlist)
         {
             int indexcount = 0;
             context.InputAssembler.SetVertexBuffers(0, new VertexBufferBinding(Cube, 32, 0));
@@ -728,7 +761,7 @@ namespace Start_Screen_Graphical
         /// <param name="device"></param>
         /// <param name="context"></param>
         /// <param name="resourceView1"></param>
-        private void drawScreen(Device device, DeviceContext context, ShaderResourceView resourceView1)
+        private void drawScreen(DeviceContext context, ShaderResourceView resourceView1)
         {
             device.ImmediateContext.PixelShader.SetShaderResource(resourceView1, 0);
             context.InputAssembler.SetVertexBuffers(0, new VertexBufferBinding(Screen, 32, 0));
@@ -752,14 +785,16 @@ namespace Start_Screen_Graphical
         [STAThread]
         static void Main()
         {
-            Console.ReadLine();
+            //Console.ReadLine();
             var form = new RenderForm ("Transparency");
+            
             start_screen mycube = new start_screen(form);
             {
                 
+                
                 MessagePump.Run(form, mycube.RenderFrame);
                 {
-                    int hi = 1;
+                    
                 }
             }
 
