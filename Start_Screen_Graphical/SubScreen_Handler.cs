@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Events;
+using Chomp;
+
 
 namespace Start_Screen_Graphical
 {
@@ -31,8 +33,10 @@ namespace Start_Screen_Graphical
                     test_form testform = new test_form(screen);
                     //initialize events
                     testform.press_pause += new PauseEvent(pauseScreen);
-                    testform.change_face += new ChangeFace(changeFace);            
-                    testform.ShowDialog();
+                    testform.change_face += new ChangeFace(changeFace);
+                    frmScreen formScreen = new frmScreen();
+                    formScreen.ShowDialog();
+                    //testform.ShowDialog();
                     break;
                 case 1:
                     test_form_2 testform_2 = new test_form_2(screen);

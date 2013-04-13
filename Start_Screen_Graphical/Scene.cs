@@ -98,10 +98,12 @@ namespace Start_Screen_Graphical
         public static float Time = 0.785f;
         public static float Zoom = 0.0f;
         public static float Cap = 0.0f;
-        public static float Cap1 = 0.0f;
+        public static float Cap1 = 0.59f;
         public static float width = 0.35f;
         public static float width1;
         public bool zoom = true;
+        //moing screen for demo purposes
+        public bool screened = false;
 
         //##############
         //Other Variables
@@ -449,12 +451,20 @@ namespace Start_Screen_Graphical
             ////position cube, then draw  
             if (Cap < 1.5f)
             {
-
-                positionCube(context, Time, 3.14f);
+                if (Cap1 > -2.0f && screened == false)
+                {
+                    positionCube(context, 1.0f, 3.14f);
+                }
+                else
+                {
+                    screened = true;
+                    positionCube(context, Time, 3.14f);
+                }
             }
 
             if (Cap >= 1.5f)
             {
+                
                 //test to see how cube will face up
                 zoomCube(context, 0.8f);
             }
@@ -470,15 +480,23 @@ namespace Start_Screen_Graphical
             //swipe should generate the screen "flying" away
             if (Cap >= 1.5f)
             {
-                updateScreen(context, 0.0f, 0.0f, 1.333f, 0.59f, 1.0f);
-                drawScreen(context, SRVscreen);
+                if (screened == false)
+                {
+                    //shift screen to start with
+                    updateScreen(context, 0.0f, 0.0f, 1.333f, 0.59f, 1.0f);
+                    drawScreen(context, SRVscreen);
+                }
 
             }
             if (Cap < 1.5f)
             {
-                updateScreen(context, 1.23f, 0.785f, 1.333f, 0.59f, 1.0f);
-                drawScreen(context, SRVscreen);
+                if (screened == false)
+                {
+                    updateScreen(context, 1.23f, 0.785f, 1.333f, Cap1, 1.0f);
+                    drawScreen(context, SRVscreen);
+                }
                 Cap += 0.0001f;
+                Cap1 -= 0.001f;
             }
 
             //set the cubes rotating position                    
@@ -570,7 +588,7 @@ namespace Start_Screen_Graphical
         /// <param name="scaleZ">change cube size in Z</param>
         private void positionCube(DeviceContext context, float y, float x)
         {
-
+            
             mRotateY = Matrix.RotationY(y);
             mRotateX = Matrix.RotationX(x);
 
