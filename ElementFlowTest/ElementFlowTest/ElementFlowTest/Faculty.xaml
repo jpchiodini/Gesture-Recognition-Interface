@@ -1,0 +1,61 @@
+﻿<UserControl x:Class="ElementFlowTest.Faculty"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:Controls="clr-namespace:FluidKit.Controls;assembly=FluidKit"
+             mc:Ignorable="d"
+             Focusable="True"
+             Loaded="UserControl_Loaded"
+             d:DesignHeight="300" d:DesignWidth="300">
+    <UserControl.Resources>
+        <DataTemplate x:Key="TestDataTemplate">
+            <Image Source="{Binding ImageLink}"
+                       Stretch="Fill" />
+        </DataTemplate>
+    </UserControl.Resources>
+    <Grid x:Name="LayoutRoot">
+        <Controls:ElementFlow x:Name="FacultyElementFlow"
+                              Grid.Row="0"
+                              Grid.Column="0"
+                              Grid.ColumnSpan="9"
+                              ItemTemplate="{DynamicResource TestDataTemplate}"
+                              TiltAngle="30"
+                              ItemGap="1"
+                              FrontItemGap="0"
+                              PopoutDistance="2"
+                              ElementWidth="200"
+                              ElementHeight="300"
+                              SelectedIndex="3">
+            <Controls:ElementFlow.Background>
+                <LinearGradientBrush EndPoint="0.5,1"
+                                     StartPoint="0.5,0">
+                    <GradientStop Color="Black" />
+                    <GradientStop Color="Red"
+                                  Offset="0.5" />
+                    <GradientStop Color="Black"
+                                  Offset="1" />
+                </LinearGradientBrush>
+            </Controls:ElementFlow.Background>
+            <Controls:ElementFlow.Layout>
+                <Controls:CoverFlow />
+            </Controls:ElementFlow.Layout>
+            <Controls:ElementFlow.Camera>
+                <PerspectiveCamera FieldOfView="60"
+                                   Position="0,2.5,6"
+                                   LookDirection="0,-3,-6" />
+            </Controls:ElementFlow.Camera>
+
+        </Controls:ElementFlow>
+        <Label x:Name="selectedFacultyLabel"
+               HorizontalAlignment="Center"
+               Margin="0,0,0,100"
+               VerticalAlignment="Bottom"
+               FontFamily="Segoe UI Symbol"
+               Foreground="White"
+               FontSize="50"
+               HorizontalContentAlignment="Center" />
+
+
+    </Grid>
+</UserControl>

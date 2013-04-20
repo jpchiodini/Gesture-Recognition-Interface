@@ -8,6 +8,7 @@ namespace Events
 {
     public delegate void PauseEvent(object sender, Pause_Form_Event e);
     public delegate void ChangeFace(object sender, Update_Face_Event e);
+    public delegate void SendAlert(object sender, Alert_Event e);
 
     
     /// <summary>
@@ -42,6 +43,21 @@ namespace Events
         public Update_Face_Event(String f_ext)
         {
             this.f_ext = f_ext;
+        }
+    }
+
+    //generates an alert for the user to wait or proceed with swiping
+    public class Alert_Event : EventArgs
+    {
+        //returns filename for strings
+        private bool alert;
+
+        public bool Alert
+        { get { return alert; } }
+
+        public Alert_Event(bool alert)
+        {
+            this.alert = alert;
         }
     }
 

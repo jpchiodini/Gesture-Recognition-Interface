@@ -36,8 +36,10 @@ namespace My_Form_Utilities
         public String getDirectory()
         {
             int end = 0;
-            String directory = System.IO.Directory.GetCurrentDirectory();            
+            String directory = System.IO.Directory.GetCurrentDirectory();
+            // directory = directory.Substring(2, directory.Length - 2);
             end = directory.IndexOf("Start_Screen_Graphical\\Start_Screen_Graphical");
+
             String final_dir = directory.Substring(0, end) + "Start_Screen_Graphical";
             return final_dir;
         }
@@ -76,6 +78,12 @@ namespace My_Form_Utilities
             var bmp = Bitmap.FromFile(file_ext);
             bmp.RotateFlip(RotateFlipType.RotateNoneFlipX);
             bmp.Save(file_ext);
+        }
+
+
+        public static float nfmod(float a, float b)
+        {
+            return a - b * (float)Math.Floor(a / b);
         }
 
 

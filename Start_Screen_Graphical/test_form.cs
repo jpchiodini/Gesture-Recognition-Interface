@@ -18,16 +18,35 @@ namespace Start_Screen_Graphical
         private List<String> faces = new List<string>();
         private Form_Utilities form_utilities = new Form_Utilities();
         int side;
+        int currentGesture;
+        public GestureEngine gestEngine;
         
         //form gets the current side
-        public test_form(int side)
-        {            
+        public test_form(int side, GestureEngine gesteng)
+        {
+            this.gestEngine = gesteng;          
+            gestEngine.GestureChanged += new Start_Screen_Graphical.GestureEngine.NewGestureEventHandler(gestEngine_GestureChanged);
+
+
             this.side = 0;
             
             // get the list of file extensions
             this.faces = form_utilities.getFileExtensions();
             InitializeComponent();
-        }        
+        }
+
+
+        private void gestEngine_GestureChanged(int newGestureID)
+        {
+            //set the current gesture equal...
+            currentGesture = newGestureID;
+
+            if (currentGesture == 4)
+            {
+                this.Close();
+            }
+
+        }
 
         private void button1_Click(object sender, EventArgs e)
         {
@@ -42,6 +61,11 @@ namespace Start_Screen_Graphical
         }
 
         private void label1_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void test_form_Load(object sender, EventArgs e)
         {
 
         }

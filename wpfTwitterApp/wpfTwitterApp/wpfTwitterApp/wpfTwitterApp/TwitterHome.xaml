@@ -1,0 +1,56 @@
+﻿<UserControl x:Class="wpfTwitterApp.TwitterHome"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:Controls="clr-namespace:FluidKit.Controls;assembly=FluidKit"
+             mc:Ignorable="d"
+             Focusable="True"
+             Loaded="UserControl_Loaded"
+             d:DesignHeight="300"
+             d:DesignWidth="300">
+    <Grid>
+        <Controls:ElementFlow x:Name="TwitterHomeElementFlow"
+                              Grid.Row="0"
+                              Grid.Column="0"
+                              Grid.ColumnSpan="9"
+                              TiltAngle="0"
+                              ItemGap="2"
+                              FrontItemGap="0"
+                              PopoutDistance="1.5"
+                              ElementWidth="400"
+                              ElementHeight="400"
+                              SelectedIndex="0"
+                              SelectionChanged="TwitterHomeElementFlow_SelectionChanged">
+            <Controls:ElementFlow.Background>
+                <LinearGradientBrush EndPoint="0.5,1"
+                                     StartPoint="0.5,0">
+                    <GradientStop Color="#FFCCFDFF" />
+                    <GradientStop Color="#FF00B5BD"
+                                  Offset="0.5" />
+                    <GradientStop Color="#FFCCFDFF"
+                                  Offset="1" />
+                </LinearGradientBrush>
+            </Controls:ElementFlow.Background>
+            <Controls:ElementFlow.Layout>
+                <Controls:VForm />
+            </Controls:ElementFlow.Layout>
+            <Controls:ElementFlow.Camera>
+                <PerspectiveCamera FieldOfView="60"
+                                   Position="0,2.5,6"
+                                   LookDirection="0,-3,-6" />
+            </Controls:ElementFlow.Camera>
+            <Image Source="Images/twitterBird.png" />
+            <Image Source="Images/camera-icon.png" />
+        </Controls:ElementFlow>
+        <Label x:Name="TwitterHomeSelectedText"
+               HorizontalAlignment="Center"
+               Margin="0,0,0,100"
+               VerticalAlignment="Bottom"
+               FontFamily="Segoe UI Symbol"
+               Foreground="White"
+               FontSize="50"
+               HorizontalContentAlignment="Center" />
+
+    </Grid>
+</UserControl>

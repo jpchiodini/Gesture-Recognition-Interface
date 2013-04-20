@@ -22,8 +22,11 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using Events;
 using My_Form_Utilities;
+using FullSkeletonSKD1;
+using System.Threading;
+using System.IO;
 
-//need to figure out how to set up multiple constant buffers...
+
 namespace Start_Screen_Graphical
 {
     /// <Scene Class Description>
@@ -33,10 +36,9 @@ namespace Start_Screen_Graphical
     /// </summary>
     public class Scene
     {
-        /**-------------------------------
-         * Struct Definitions
-         *-----------------------------*/
-        //holds vertices along with normals and textcoords
+        //STRUCT DEFINITIONS.
+
+        //Holds vertices along with normals and textcoords.
         struct myVertex
         {
             public myVertex(Vector3 pos, Vector3 normal, Vector2 uv)
@@ -49,7 +51,7 @@ namespace Start_Screen_Graphical
             Vector3 Normal;
             Vector2 UV;
         };
-        //Struct defining Constant Buffer info for cube
+        //Struct defining Constant Buffer info for cube.
         struct CBUFFER
         {
             public Matrix Final;
@@ -58,12 +60,11 @@ namespace Start_Screen_Graphical
             public Vector4 LightColor;
             public Vector4 AmbientColor;
         }
-        /*######################
-         *  Initializations
-         *######################*/
-        //View matrices
+
+        //VIEW MATRICES
+
         //cube
-        Matrix IdMat, mTranslate, mScale, myLook, matProjection, mRotate1;
+        Matrix mTranslate, mScale, myLook, matProjection, mRotate1;
         //screen
         Matrix sTranslate, sScale, smyLook, smatProjection, sRotate1;
         //world matrices
@@ -72,59 +73,131 @@ namespace Start_Screen_Graphical
         //cube
         Matrix mRotateX, mRotateY, mRotateZ;
         //screen
-        Matrix sRotateX, sRotateY, sRotateZ;
+        Matrix sRotateX;
+
 
         Device device;
-        Buffer Cube, Screen;
+
         InputLayout layout;
         ShaderSignature inputSignature;
-        ShaderResourceView SRVscreen, SRV, SRV1, SRV2, SRV3, SRV4, SRV5;
+        //textures
+        ShaderResourceView skeletonSRV,SRVscreen, SRVAlert1, SRVAlert2, SRV, SRV1, SRV2, SRV3, SRV4, SRV5;
+        //texture list for cube
         List<ShaderResourceView> SRVlist = new List<ShaderResourceView>();
+        //texture list for alert
+        List<ShaderResourceView> SRVAlertlist = new List<ShaderResourceView>();
+
         PixelShader pixelShader;
         VertexShader vertexShader;
-        Buffer constantBuffer, constantBuffer1;
+        Buffer Cube, Screen, Alert;
+        Buffer constantBuffer;
         Buffer indexBuffer;
         Buffer screenIndexBuffer;
+        Buffer alertIndexBuffer;
         CBUFFER cbuffer, cbuffer1;
         BlendState enabled;
 
+        //objects
+        SubScreen_Handler SSH;
+        //SkeletonImage skImg;
+        private Form_Utilities form_utilities = new Form_Utilities();
+        GestureEngine gestEngine;
+        Bitmap bmp;
+        //MemoryStream stream = new MemoryStream()
         //event handler
         public event PauseEvent press_pause;
         public event ChangeFace change_face;
 
-        //#######################
-        //offsets
-        //#######################
+        //VARIABLES
         public static float Time = 0.785f;
+        public static float timeCap = 0.785f;
         public static float Zoom = 0.0f;
         public static float Cap = 0.0f;
-        public static float Cap1 = 0.0f;
+        public static float Cap1 = 0.59f;
         public static float width = 0.35f;
         public static float width1;
         public bool zoom = true;
-
-        //##############
-        //Other Variables
-        //##############
+        public bool screened = false;
+        public bool can_swipe = true;
+        public bool signed_in = false;
+        bool lock_screen = false;
+        bool initial_lock = false;
         int currentFace = 0;
-        private Form_Utilities form_utilities = new Form_Utilities();
+        //Default gesture
+        int currentGesture = 10;
+        public float before_zoom = 0.785f;
+        //Current index of face
+        float face_index = 0;
+        float face_pos = 0;
+        public int state = 0;
 
-
+        /// <summary>
+        /// Default constructor for scene initialization
+        /// </summary>
+        /// <param name="device"></param>
+        /// <param name="form"></param>
+        /// <param name="context"></param>
         public Scene(Device device, Form form, DeviceContext context)
         {
+            //Get the input for a new gesture
+            gestEngine = new GestureEngine();
+            //Initialize the subscreen handler
+            SSH = new SubScreen_Handler(gestEngine);
+            //initialize new skeleton image detection
+            //skImg = new SkeletonImage();
+
+            gestEngine.reset();
+            gestEngine.init();
+            gestEngine.GestureChanged += new Start_Screen_Graphical.GestureEngine.NewGestureEventHandler(gestEngine_GestureChanged);
             this.device = device;
             initTextures();
             Initialize(form, context);
             CreateCube();
             createScreen();
+            createAlert();
             CreateConstBuffer(context);
             CubeIndexBuffer();
             ScreenIndexBuffer();
+            AlertIndexBuffer();
             BuildShaderInputLayout();
         }
 
         /// <summary>
-        /// Applies a new texture to the cube representing last state of closed form
+        /// Gets new gesture ID from Kinect via Gesture Engine
+        /// </summary>
+        /// <param name="newGestureID"></param>
+        private void gestEngine_GestureChanged(int newGestureID)
+        {
+            if (lock_screen == false && initial_lock == false)
+            {
+                //Updates Global current gesture.
+                currentGesture = newGestureID;
+
+                if (currentGesture == 0 || currentGesture == 1)
+                {
+                    lock_screen = true;
+                }
+
+                if (currentGesture == 0)
+                {
+                    timeCap += 1.57f;
+                }
+
+                if (currentGesture == 1)
+                {
+                    timeCap -= 1.57f;
+                }
+
+                if (currentGesture == 2)
+                {
+                    lock_screen = true;
+                }
+            }
+
+        }
+
+        /// <summary>
+        /// Applies a new texture to the cube representing last state of closed form.
         /// </summary>
         /// <param name="a"></param>
         /// <param name="e"></param>
@@ -149,32 +222,32 @@ namespace Start_Screen_Graphical
             //purple orange red yellow                      |
             //##############################################|
 
-            String temp = e.file_extension;
             //parse the string to take out the number...
+            String temp = e.file_extension;
             String ext = temp.Substring(0, (temp.Length - 1));
             String faceNum = temp.Substring(temp.Length - 1, 1);
             int index = Convert.ToInt32(faceNum);
 
             switch (index)
             {
-                //if its the first face
+                //first face
                 case 0:
                     //set it to the purple face
                     //mirror the extension
                     form_utilities.mirrorImage(ext);
                     SRVlist[1] = ShaderResourceView.FromFile(device, ext);
                     break;
-                //if its the second face
+                //second face
                 case 1:
                     //set it to the orange face
                     SRVlist[5] = ShaderResourceView.FromFile(device, ext);
                     break;
-                //if its the third face
+                //third face
                 case 2:
                     //set it to the red face
                     SRVlist[0] = ShaderResourceView.FromFile(device, ext);
                     break;
-                //if its the fourth face
+                //fourth face
                 case 3:
                     //set it to the yellow face
                     //mirror the face due to culling
@@ -185,54 +258,66 @@ namespace Start_Screen_Graphical
 
         }
 
-        
+        /// <summary>
+        /// Set up Shader Resource Views for initial rendering.
+        /// </summary>
         private void initTextures()
         {
-            //screen 
-            //screen textures are mirrored in wrong, because of culling or transparency, i built a temp fix.
+
+            //screen textures are mirrored in wrong, because of culling or transparency
             String img_directory = form_utilities.getDirectory() + "\\images\\Sample Pictures";
-            
-            SRVscreen = ShaderResourceView.FromFile(device,img_directory + "\\metallic.jpg");
+
+            //SRVscreen = ShaderResourceView.FromStream(device,)
+            SRVscreen = ShaderResourceView.FromFile(device, img_directory + "\\metallic.jpg");
+
+            //alert            
+            SRVAlert1 = ShaderResourceView.FromFile(device, img_directory + "\\stop.png");
+            SRVAlert2 = ShaderResourceView.FromFile(device, img_directory + "\\go.jpg");
+            //skeleton
+            skeletonSRV = ShaderResourceView.FromFile(device, img_directory + "\\black.jpg");
+
             //top and bottom
             SRV2 = ShaderResourceView.FromFile(device, img_directory + "\\green.jpg");
             SRV3 = ShaderResourceView.FromFile(device, img_directory + "\\blue.jpg");
 
-            //side faces
             //yellow and purple are at the back so dont get rendered by back buffer
             //used mirror image to fix
             String yellow_ext = img_directory + "\\yellow.jpg";
             String purple_ext = img_directory + "\\purple.jpg";
             form_utilities.mirrorImage(yellow_ext);
             form_utilities.mirrorImage(purple_ext);
-
             SRV4 = ShaderResourceView.FromFile(device, yellow_ext);
             SRV1 = ShaderResourceView.FromFile(device, purple_ext);
-
             SRV = ShaderResourceView.FromFile(device, img_directory + "\\red.jpg");
             SRV5 = ShaderResourceView.FromFile(device, img_directory + "\\orange.jpg");
 
+            //add to cube faces
             SRVlist.Add(SRV);
             SRVlist.Add(SRV1);
             SRVlist.Add(SRV2);
             SRVlist.Add(SRV3);
             SRVlist.Add(SRV4);
             SRVlist.Add(SRV5);
+
+            //add to alert faces
+            SRVAlertlist.Add(SRVAlert1);
+            SRVAlertlist.Add(SRVAlert2);
         }
-        //initialize the cube matrices
+        /// <summary>
+        /// Initialize all rotation Matrices
+        /// </summary>
+        /// <param name="form"></param>
+        /// <param name="context"></param>
         public void Initialize(Form form, DeviceContext context)
         {
-            /*---------------------------------
-             * Constant Buffer Initialization
-             *---------------------------------*/
-            //Identity matrix for later use
+
             //Set up translation matrix.
-            //Set up rotation matrix, gets updated in Draw Method
-            //set up scaling
-            //Set up projection matrix for camera
-            //Multiply Matrices for camera            
             myLook = smyLook = Matrix.LookAtLH(new Vector3(2.0f, 1.0f, 2.0f), new Vector3(0.0f, 0.0f, 0.0f), new Vector3(0.0f, 1.0f, 0.0f));
+            //Set up projection matrix for camera
             matProjection = smatProjection = Matrix.PerspectiveFovLH((float)((float)45 * ((float)3.14 / (float)180)), (float)form.ClientSize.Width / (float)form.ClientSize.Height, 1.0f, 100.0f);
+            //Multiply Matrices for camera
             matFinal = mRotateX * mRotate1 * myLook * matProjection;
+            //Set up rotation matrix, gets updated in Draw Method
             cbuffer.Rotatation = mRotateX;
             cbuffer.Final = matFinal;
             cbuffer.LightVector = new Vector4(1.0f, 1.0f, 1.0f, 0.0f);
@@ -252,59 +337,59 @@ namespace Start_Screen_Graphical
             var update1 = new DataStream(size, true, true);
             update.Write<CBUFFER>(cbuffer1);
             update.Position = 0;
-
         }
 
         /// <summary>
-        /// Sets up cube vertices
+        /// Set up cube vertices.
         /// </summary>
         /// <param name="device"></param>
         public void CreateCube()
         {
 
-            //for transparent screen...
             int size = Marshal.SizeOf(typeof(myVertex));
             // create test vertex data, making sure to rewind the stream afterward
             DataStream vertices = new DataStream(size * 24 * 7, true, true);
-
-            vertices.Write(new myVertex(new Vector3(-0.5f, -0.5f, 0.5f), new Vector3(0.0f, 0.0f, 1.0f), new Vector2(0.0f, 0.0f)));    // side 1
-            vertices.Write(new myVertex(new Vector3(0.5f, -0.5f, 0.5f), new Vector3(0.0f, 0.0f, 1.0f), new Vector2(1.0f, 0.0f)));       //red
+            // Side 1 //Red
+            vertices.Write(new myVertex(new Vector3(-0.5f, -0.5f, 0.5f), new Vector3(0.0f, 0.0f, 1.0f), new Vector2(0.0f, 0.0f)));
+            vertices.Write(new myVertex(new Vector3(0.5f, -0.5f, 0.5f), new Vector3(0.0f, 0.0f, 1.0f), new Vector2(1.0f, 0.0f)));
             vertices.Write(new myVertex(new Vector3(-0.5f, 0.5f, 0.5f), new Vector3(0.0f, 0.0f, 1.0f), new Vector2(0.0f, 1.0f)));
             vertices.Write(new myVertex(new Vector3(0.5f, 0.5f, 0.5f), new Vector3(0.0f, 0.0f, 1.0f), new Vector2(1.0f, 1.0f)));
-
-            vertices.Write(new myVertex(new Vector3(-0.5f, -0.5f, -0.5f), new Vector3(0.0f, 0.0f, -1.0f), new Vector2(0.0f, 0.0f)));    // side 2
-            vertices.Write(new myVertex(new Vector3(-0.5f, 0.5f, -0.5f), new Vector3(0.0f, 0.0f, -1.0f), new Vector2(0.0f, 1.0f)));     //purple
+            //Side 2, purple.
+            vertices.Write(new myVertex(new Vector3(-0.5f, -0.5f, -0.5f), new Vector3(0.0f, 0.0f, -1.0f), new Vector2(0.0f, 0.0f)));
+            vertices.Write(new myVertex(new Vector3(-0.5f, 0.5f, -0.5f), new Vector3(0.0f, 0.0f, -1.0f), new Vector2(0.0f, 1.0f)));
             vertices.Write(new myVertex(new Vector3(0.5f, -0.5f, -0.5f), new Vector3(0.0f, 0.0f, -1.0f), new Vector2(1.0f, 0.0f)));
             vertices.Write(new myVertex(new Vector3(0.5f, 0.5f, -0.5f), new Vector3(0.0f, 0.0f, -1.0f), new Vector2(1.0f, 1.0f)));
-
-            vertices.Write(new myVertex(new Vector3(-0.5f, 0.5f, -0.5f), new Vector3(0.0f, 1.0f, 0.0f), new Vector2(0.0f, 0.0f)));    // side 3
-            vertices.Write(new myVertex(new Vector3(-0.5f, 0.5f, 0.5f), new Vector3(0.0f, 1.0f, 0.0f), new Vector2(0.0f, 1.0f)));   //green
+            //Side 3, green.
+            vertices.Write(new myVertex(new Vector3(-0.5f, 0.5f, -0.5f), new Vector3(0.0f, 1.0f, 0.0f), new Vector2(0.0f, 0.0f)));
+            vertices.Write(new myVertex(new Vector3(-0.5f, 0.5f, 0.5f), new Vector3(0.0f, 1.0f, 0.0f), new Vector2(0.0f, 1.0f)));
             vertices.Write(new myVertex(new Vector3(0.5f, 0.5f, -0.5f), new Vector3(0.0f, 1.0f, 0.0f), new Vector2(1.0f, 0.0f)));
             vertices.Write(new myVertex(new Vector3(0.5f, 0.5f, 0.5f), new Vector3(0.0f, 1.0f, 0.0f), new Vector2(1.0f, 1.0f)));
-
-            vertices.Write(new myVertex(new Vector3(-0.5f, -0.5f, -0.5f), new Vector3(0.0f, -1.0f, 0.0f), new Vector2(0.0f, 0.0f)));    // side 4
+            //Side 4, ?
+            vertices.Write(new myVertex(new Vector3(-0.5f, -0.5f, -0.5f), new Vector3(0.0f, -1.0f, 0.0f), new Vector2(0.0f, 0.0f)));
             vertices.Write(new myVertex(new Vector3(0.5f, -0.5f, -0.5f), new Vector3(0.0f, -1.0f, 0.0f), new Vector2(0.0f, 1.0f)));
             vertices.Write(new myVertex(new Vector3(-0.5f, -0.5f, 0.5f), new Vector3(0.0f, -1.0f, 0.0f), new Vector2(1.0f, 1.0f)));
             vertices.Write(new myVertex(new Vector3(0.5f, -0.5f, 0.5f), new Vector3(0.0f, -1.0f, 0.0f), new Vector2(1.0f, 0.0f)));
-
-            vertices.Write(new myVertex(new Vector3(0.5f, -0.5f, -0.5f), new Vector3(1.0f, 0.0f, 0.0f), new Vector2(0.0f, 0.0f)));    // side 5
-            vertices.Write(new myVertex(new Vector3(0.5f, 0.5f, -0.5f), new Vector3(1.0f, 0.0f, 0.0f), new Vector2(0.0f, 1.0f)));      //yellow
+            //Side 5, yellow
+            vertices.Write(new myVertex(new Vector3(0.5f, -0.5f, -0.5f), new Vector3(1.0f, 0.0f, 0.0f), new Vector2(0.0f, 0.0f)));
+            vertices.Write(new myVertex(new Vector3(0.5f, 0.5f, -0.5f), new Vector3(1.0f, 0.0f, 0.0f), new Vector2(0.0f, 1.0f)));
             vertices.Write(new myVertex(new Vector3(0.5f, -0.5f, 0.5f), new Vector3(1.0f, 0.0f, 0.0f), new Vector2(1.0f, 0.0f)));
-            vertices.Write(new myVertex(new Vector3(0.5f, 0.5f, 0.5f), new Vector3(1.0f, 0.0f, 0.0f), new Vector2 (1.0f, 1.0f)));
-
-            vertices.Write(new myVertex(new Vector3(-0.5f, -0.5f, -0.5f), new Vector3(-1.0f, 0.0f, 0.0f), new Vector2(0.0f, 0.0f)));    // side 6
-            vertices.Write(new myVertex(new Vector3(-0.5f, -0.5f, 0.5f), new Vector3(-1.0f, 0.0f, 0.0f), new Vector2(1.0f, 0.0f)));     //orange
+            vertices.Write(new myVertex(new Vector3(0.5f, 0.5f, 0.5f), new Vector3(1.0f, 0.0f, 0.0f), new Vector2(1.0f, 1.0f)));
+            //Side 6, orange
+            vertices.Write(new myVertex(new Vector3(-0.5f, -0.5f, -0.5f), new Vector3(-1.0f, 0.0f, 0.0f), new Vector2(0.0f, 0.0f)));
+            vertices.Write(new myVertex(new Vector3(-0.5f, -0.5f, 0.5f), new Vector3(-1.0f, 0.0f, 0.0f), new Vector2(1.0f, 0.0f)));
             vertices.Write(new myVertex(new Vector3(-0.5f, 0.5f, -0.5f), new Vector3(-1.0f, 0.0f, 0.0f), new Vector2(0.0f, 1.0f)));
             vertices.Write(new myVertex(new Vector3(-0.5f, 0.5f, 0.5f), new Vector3(-1.0f, 0.0f, 0.0f), new Vector2(1.0f, 1.0f)));
-
             vertices.Position = 0;
 
-            //vertex buffer
+            //Vertex Buffer.
             Cube = new Buffer(device, vertices, size * 24 * 7, ResourceUsage.Dynamic, BindFlags.VertexBuffer, CpuAccessFlags.Write, ResourceOptionFlags.None, 0);
         }
+        /// <summary>
+        /// Set up Transparent Screen
+        /// </summary>
         public void createScreen()
         {
-            //for transparent screen...
+
             int size = Marshal.SizeOf(typeof(myVertex));
             // create test vertex data, making sure to rewind the stream afterward
             DataStream vertices = new DataStream(size * 24, true, true);
@@ -315,10 +400,34 @@ namespace Start_Screen_Graphical
             vertices.Write(new myVertex(new Vector3(1.0f, 1.0f, 1.0f), new Vector3(0.0f, 1.0f, 0.0f), new Vector2(1.0f, 1.0f)));
             vertices.Position = 0;
 
-            //vertex buffer
+            //Vertex Buffer
             Screen = new Buffer(device, vertices, size * 24, ResourceUsage.Dynamic, BindFlags.VertexBuffer, CpuAccessFlags.Write, ResourceOptionFlags.None, 0);
 
         }
+        /// <summary>
+        ///  Create an alert square on the top right to guide user gestures.
+        /// </summary>
+        public void createAlert()
+        {
+
+            //for green or red cube
+            int size = Marshal.SizeOf(typeof(myVertex));
+            // create test vertex data, making sure to rewind the stream afterward
+            DataStream vertices = new DataStream(size * 24, true, true);
+
+            vertices.Write(new myVertex(new Vector3(-1.0f, 1.0f, -1.0f), new Vector3(0.0f, 1.0f, 0.0f), new Vector2(0.0f, 0.0f)));    // side 3
+            vertices.Write(new myVertex(new Vector3(-1.0f, 1.0f, 1.0f), new Vector3(0.0f, 1.0f, 0.0f), new Vector2(0.0f, 1.0f)));
+            vertices.Write(new myVertex(new Vector3(1.0f, 1.0f, -1.0f), new Vector3(0.0f, 1.0f, 0.0f), new Vector2(1.0f, 0.0f)));
+            vertices.Write(new myVertex(new Vector3(1.0f, 1.0f, 1.0f), new Vector3(0.0f, 1.0f, 0.0f), new Vector2(1.0f, 1.0f)));
+            vertices.Position = 0;
+
+            //Vertex Buffer
+            Alert = new Buffer(device, vertices, size * 24, ResourceUsage.Dynamic, BindFlags.VertexBuffer, CpuAccessFlags.Write, ResourceOptionFlags.None, 0);
+
+        }
+        /// <summary>
+        /// Set up Cube Index Buffer.
+        /// </summary>
         public void CubeIndexBuffer()
         {
 
@@ -339,11 +448,14 @@ namespace Start_Screen_Graphical
                 22, 21, 23,
                 
             };
-            DataStream indices = new DataStream(size * 42, true, true); //**
+            DataStream indices = new DataStream(size * 42, true, true);
             indices.WriteRange(OurIndices);
             indices.Position = 0;
             indexBuffer = new Buffer(device, indices, Marshal.SizeOf(typeof(uint)) * 42, ResourceUsage.Dynamic, BindFlags.IndexBuffer, CpuAccessFlags.Write, ResourceOptionFlags.None, 0); //*
         }
+        /// <summary>
+        /// Set up Screen Index Buffer
+        /// </summary>
         public void ScreenIndexBuffer()
         {
             int size = sizeof(uint);
@@ -358,6 +470,28 @@ namespace Start_Screen_Graphical
             screenIndexBuffer = new Buffer(device, indices, Marshal.SizeOf(typeof(uint)) * 6, ResourceUsage.Dynamic, BindFlags.IndexBuffer, CpuAccessFlags.Write, ResourceOptionFlags.None, 0);
 
         }
+
+        /// <summary>
+        /// Set up Alert Index Buffer
+        /// </summary>
+        public void AlertIndexBuffer()
+        {
+            int size = sizeof(uint);
+            uint[] OurIndices = 
+            {  
+                0, 1, 2,    // side 1
+                2, 1, 3,  
+            };
+            DataStream indices = new DataStream(size * 6, true, true);
+            indices.WriteRange(OurIndices);
+            indices.Position = 0;
+            alertIndexBuffer = new Buffer(device, indices, Marshal.SizeOf(typeof(uint)) * 6, ResourceUsage.Dynamic, BindFlags.IndexBuffer, CpuAccessFlags.Write, ResourceOptionFlags.None, 0);
+
+        }
+
+        /// <summary>
+        /// Compile shader code and add it with Textures.
+        /// </summary>
         public void BuildShaderInputLayout()
         {
 
@@ -371,15 +505,12 @@ namespace Start_Screen_Graphical
             using (var bytecode = ShaderBytecode.CompileFromFile("C:\\transparent.fx", "PShader", "ps_4_0", ShaderFlags.None, EffectFlags.None))
                 pixelShader = new PixelShader(device, bytecode);
 
-
             //Create vertex layout.
             var elements = new[] 
-            {
-                
+            {                
                 new InputElement("POSITION",0, SlimDX.DXGI.Format.R32G32B32_Float, 0,0,InputClassification.PerVertexData,0),               
-                new InputElement("NORMAL", 0 ,SlimDX.DXGI.Format.R32G32B32_Float,12,0,InputClassification.PerVertexData,0), //why does zero not work here????
-                new InputElement("TEXCOORD", 0 ,SlimDX.DXGI.Format.R32G32B32_Float,24,0,InputClassification.PerVertexData,0), //why does zero not work here????
-                                
+                new InputElement("NORMAL", 0 ,SlimDX.DXGI.Format.R32G32B32_Float,12,0,InputClassification.PerVertexData,0), 
+                new InputElement("TEXCOORD", 0 ,SlimDX.DXGI.Format.R32G32B32_Float,24,0,InputClassification.PerVertexData,0),                                
             };
             //config what things will be extracated from the shaders
             layout = new InputLayout(device, inputSignature, elements);
@@ -424,6 +555,8 @@ namespace Start_Screen_Graphical
             myLook = smyLook = Matrix.LookAtLH(new Vector3(2.0f, height, 2.0f), new Vector3(0.0f, 0.0f, 0.0f), new Vector3(0.0f, 1.0f, 0.0f));
         }
 
+
+
         /// <summary>
         /// Draws all objects on screen, holds drawing logic
         /// </summary>
@@ -433,58 +566,107 @@ namespace Start_Screen_Graphical
         public void Draw(DeviceContext context, List<Texture2D> textpack, Form form)
         {
             // configure the Input Assembler portion of the pipeline with the vertex data
-            //set shaders and buffers                        
-
+            //set shaders and buffers 
+            //this.bmp = skImg.getImage();
+            this.bmp = gestEngine.getImage();
+            if (bmp != null)
+            {
+                using (MemoryStream stream = new MemoryStream())
+                {
+                    // Save image to stream.
+                    bmp.Save(stream, System.Drawing.Imaging.ImageFormat.Jpeg);
+                    stream.Position = 0;
+                    SRVscreen = ShaderResourceView.FromStream(device, stream, (int)stream.Length);
+                }
+            }
             context.InputAssembler.InputLayout = layout;
             context.InputAssembler.PrimitiveTopology = PrimitiveTopology.TriangleList;
             context.VertexShader.Set(vertexShader);
             context.PixelShader.Set(pixelShader);
             context.VertexShader.SetConstantBuffer(constantBuffer, 0);
             context.PixelShader.SetConstantBuffer(constantBuffer, 0);
-            //#########
-            //Drawing logic
-            //#########
-            //DEMO 1
-            //cap initially starts at zero
-            ////position cube, then draw  
-            if (Cap < 1.5f)
-            {
 
+            //BEGIN DRAWING LOGIC
+
+            //if there is no inputted gesture stay as is
+            if (currentGesture == 10 || signed_in == false)
+            {
+                positionCube(context, 1.0f, 3.14f);
+            }
+            if (currentGesture == 11 && signed_in == true)
+            {
+                positionCube(context, face_pos, 3.14f);
+            }
+
+            //if right gesture
+            if (currentGesture == 0 && signed_in == true)
+            {
+                screened = true;
+                //position alerts                    
+                drawAlert(context, SRVAlertlist);
+                positionCube(context, Time, 3.14f);
+
+            }
+
+            //if left gesture
+            if (currentGesture == 1 && signed_in == true)
+            {
+                screened = true;
+                //position alerts                    
+                drawAlert(context, SRVAlertlist);
                 positionCube(context, Time, 3.14f);
             }
 
-            if (Cap >= 1.5f)
+            //if zoomed is called
+            if (currentGesture == 2 && signed_in == true)
             {
                 //test to see how cube will face up
                 zoomCube(context, 0.8f);
             }
+            //draw cube
             drawCube(context, SRVlist);
 
             //enable blending
             context.OutputMerger.BlendState = enabled;
             InitState(device);
+
             //position screen, then draw
-
-            //game logic in seperate class 
-            //not yet sure how to transform from screen coordinates to world coordinates, for the moment, just using brute force
-            //swipe should generate the screen "flying" away
-            if (Cap >= 1.5f)
+            //Caps control when screen should dissapear.
+            if (currentGesture == 3 && Cap < 0.5f)
             {
-                updateScreen(context, 0.0f, 0.0f, 1.333f, 0.59f, 1.0f);
-                drawScreen(context, SRVscreen);
-
+                if (screened == false)
+                {
+                    signed_in = true;
+                    //make the screen shrink
+                    initial_lock = true;
+                    drawAlert(context, SRVAlertlist);
+                    updateScreen(context, 1.23f, 0.785f, 1.333f, Cap1, 1.0f);
+                    drawScreen(context, SRVscreen);
+                    positionCube(context, 1.0f, 3.14f);
+                }
+                Cap += 0.005f;
+                Cap1 -= 0.05f;
             }
-            if (Cap < 1.5f)
+            else if (Cap < 0.5f)
             {
                 updateScreen(context, 1.23f, 0.785f, 1.333f, 0.59f, 1.0f);
                 drawScreen(context, SRVscreen);
-                Cap += 0.0001f;
+            }
+            else
+            {
+                initial_lock = false;
+                screened = true;
             }
 
             //set the cubes rotating position                    
             //use world coordinates to let the cube zoom to fill the screen.... have that bring up a blank form... and then exiting brings back the cube with updated screenshot pics...
             context.OutputMerger.BlendState = null;
+
+            //draw skeleton stream on top???
+            drawSkeletonStream(context, skeletonSRV);
+
         }
+
         /// <summary>
         /// Zooms the cube in based on variable time, calculates correct face to zoom
         /// </summary>
@@ -493,45 +675,71 @@ namespace Start_Screen_Graphical
         public void zoomCube(DeviceContext context, float limit)
         {
 
+            //float index1 = 0;
+            float[] cubepos = { 0.0f, 1.57f * 1.0f, 1.57f * 2.0f, 1.57f * 3.0f };
+
+            //reversed index positions for backwards cube
+            float[] cubepos_neg = { 1.57f * 3.0f, 1.57f * 2.0f, 1.57f * 1.0f, 0.0f };
 
             if (Zoom < limit)
             {
                 //takes the current rotation value, and finds which side of the cube is being selected
-                float[] cubepos = { 0.0f, 1.57f * 1.0f, 1.57f * 2.0f, 1.57f * 3.0f };
-                //divide by rotation number
-                //take the time and mod by four
-                float temp = (Time - 0.785f) / 1.57f;
-                int temp1 = (int)Math.Ceiling(temp);
-                int index = temp1 % 4;
-                moveCamera(0.0f);
-                //position the cube
-                positionCube(context, 0.0f, cubepos[index] + 0.785f, 3.14f, Zoom, 0.0f, Zoom, true);
-                currentFace = index;
-                Zoom += 0.001f;
+                float temp = (Time) / 1.57f;
+
+                if (Time >= 0.785f)
+                {
+                    //round down
+                    temp = (float)Math.Floor(temp);
+                    //index1 = Form_Utilities.nfmod(temp, 4.0f);
+                    face_index = temp % 4;
+                    //reset world camera
+                    moveCamera(0.0f);
+                    positionCube(context, 0.0f, cubepos[(int)face_index] + 0.785f, 3.14f, Zoom, 0.0f, Zoom, true);
+                    currentFace = (int)face_index;
+                    face_pos = cubepos[(int)face_index] + 0.785f;
+                }
+                //if the cube is turning in negative  
+                else if (Time < 0)
+                {
+                    //round down
+                    temp = (float)Math.Floor(temp);
+                    face_index = Form_Utilities.nfmod(temp, 4.0f);
+                    //Reset world camera.
+                    moveCamera(0.0f);
+                    positionCube(context, 0.0f, cubepos[(int)face_index] + 0.785f, 3.14f, Zoom, 0.0f, Zoom, true);
+                    currentFace = (int)face_index;
+                    face_pos = cubepos[(int)face_index] + 0.785f;
+                }
+                Zoom += 0.01f;
             }
-            //otherwise reset.. this is just for demo purposes
+            //Reset cube to rest on the face that was just picked.
             else
             {
                 //send a pause event.
                 press_pause(this, new Pause_Form_Event(true));
 
                 //open the selected face of the cube... will send events back to this class...
-                SubScreen_Handler SSH = new SubScreen_Handler(currentFace);
+                // SubScreen_Handler SSH = new SubScreen_Handler(currentFace, gestEngine);
+                SSH.setScreen(currentFace);
 
                 //get the command whether to pause or not
                 SSH.press_pause += new PauseEvent(getState);
                 SSH.change_face += new ChangeFace(getNewFace);
                 SSH.RenderForm();
 
-                //reset the original cube
-                Cap = 0.0f;
+                //reset the original cube                
+                currentGesture = 11;
                 Zoom = 0.0f;
+
+                //set everything to the index position, and rotate from there                
+                //before_zoom = cubepos[(int)face_index] + 0.785f;
+
+                timeCap = Time;
                 //reset camera to initial position
                 moveCamera(1.0f);
+                lock_screen = false;
             }
         }
-
-
         /// <summary>
         /// Receives an alert when its time for the system to wake back up
         /// </summary>
@@ -559,6 +767,8 @@ namespace Start_Screen_Graphical
             blendStateDesc.RenderTargets[0].RenderTargetWriteMask = ColorWriteMaskFlags.All;
             enabled = BlendState.FromDescription(device, blendStateDesc);
         }
+
+
         /// <summary>
         /// Updates Matrices to change the position and rotation of home screen cube
         /// </summary>
@@ -575,17 +785,39 @@ namespace Start_Screen_Graphical
             mRotateX = Matrix.RotationX(x);
 
             //still have to fix lighting if x rotation is invoked...
-            matFinal = mRotateX* mRotateY * myLook * matProjection;
-            cbuffer.Rotatation = mRotateX* mRotateY;
+            matFinal = mRotateX * mRotateY * myLook * matProjection;
+            cbuffer.Rotatation = mRotateX * mRotateY;
             cbuffer.Final = matFinal;
             int size = Marshal.SizeOf(typeof(CBUFFER));
             var update = new DataStream(size, true, true);
             update.Write<CBUFFER>(cbuffer);
             update.Position = 0;
             //update vertices on gpu
+            if (currentGesture == 0)
+            {
+                if (Time < timeCap)
+                {
+                    Time += 0.05f;
+                }
+                else
+                {
+                    lock_screen = false;
+                    currentGesture = 12;
+                }
+            }
+            if (currentGesture == 1)
+            {
+                if (Time > timeCap)
+                {
+                    Time -= 0.05f;
+                }
+                else
+                {
+                    lock_screen = false;
+                    currentGesture = 12;
+                }
+            }
             context.UpdateSubresource(new DataBox(0, 0, update), constantBuffer, 0);
-            Time += 0.0005f;
-
         }
         /// <summary>
         /// more precise positioning, can also choose the mode in which the enlargement of cube can occur, used in select animation.
@@ -601,14 +833,11 @@ namespace Start_Screen_Graphical
             mRotateZ = Matrix.RotationZ(z);
             mRotateY = Matrix.RotationY(y);
             mRotateX = Matrix.RotationX(x);
-
             mScale = Matrix.Scaling(scaleX, scaleY, scaleZ);
             mTranslate = Matrix.Translation(scaleX, scaleY, scaleZ);
-            //if scaling is true, then scale + translate... otw just scale            
-
+            //if scaling is true, then scale + translate... otw just scale   
             matFinal = mRotateX * mRotateY * mRotateZ * mTranslate * myLook * matProjection;
-            //matFinal = mRotateX * myLook * matProjection;
-            cbuffer.Rotatation = mRotateX*mRotateY*mRotateZ;
+            cbuffer.Rotatation = mRotateX * mRotateY * mRotateZ;
             cbuffer.Final = matFinal;
             int size = Marshal.SizeOf(typeof(CBUFFER));
             var update = new DataStream(size, true, true);
@@ -638,26 +867,21 @@ namespace Start_Screen_Graphical
             //        |
             //        |
             //       / \
-            //    x       y
-
-
+            //     x     y
 
             sRotate1 = Matrix.RotationX(x);
             sRotateX = Matrix.RotationY(y);
-
             sScale = Matrix.Scaling(scaleX, scaleY, scaleZ);
             sTranslate = Matrix.Translation(scaleX, scaleY, scaleZ);
             screenFinal = sScale * sRotate1 * sRotateX * myLook * matProjection;
-
             cbuffer1.Rotatation = sRotateX * sRotate1;
             cbuffer1.Final = screenFinal;
             int size = Marshal.SizeOf(typeof(CBUFFER));
             var update = new DataStream(size, true, true);
             update.Write<CBUFFER>(cbuffer1);
             update.Position = 0;
-            //update vertices on gpu
+            //Update vertices on GPU.
             context.UpdateSubresource(new DataBox(0, 0, update), constantBuffer, 0);
-
         }
         /// <summary>
         /// update screen coordinates for rotation
@@ -674,6 +898,44 @@ namespace Start_Screen_Graphical
             //sRotateX = Matrix.RotationY(y);
             screenFinal = sRotateX * smyLook * smatProjection;
             cbuffer1.Rotatation = sRotateX;
+            cbuffer1.Final = screenFinal;
+            int size = Marshal.SizeOf(typeof(CBUFFER));
+            var update = new DataStream(size, true, true);
+            update.Write<CBUFFER>(cbuffer1);
+            update.Position = 0;
+            //update vertices on gpu
+            context.UpdateSubresource(new DataBox(0, 0, update), constantBuffer, 0);
+        }
+        /// <summary>
+        /// Alows for positioning of the Alert object
+        /// (now also includes skeleton stream object)
+        /// </summary>
+        /// <param name="context"></param>
+        /// <param name="x">X rotation</param>
+        /// <param name="y">Y rotation</param>
+        /// <param name="scaleX">scale in X</param>
+        /// <param name="scaleY">scale in Y</param>
+        /// <param name="scaleZ">scale in Z</param>
+        /// <param name="transX">translate object in X</param>
+        /// <param name="transY">translate object in Y</param>
+        /// <param name="transZ">translate object in Z</param>
+        private void updateAlert(DeviceContext context, float x, float y, float scaleX, float scaleY, float scaleZ, float transX, float transY, float transZ)
+        {
+            //axis map
+            //        z            
+            //        |
+            //        |
+            //        |
+            //       / \
+            //    x       y
+
+
+            sRotate1 = Matrix.RotationX(x);
+            sRotateX = Matrix.RotationY(y);
+            sScale = Matrix.Scaling(scaleX, scaleY, scaleZ);
+            sTranslate = Matrix.Translation(transX, transY, transZ);
+            screenFinal = sScale * sTranslate * sRotate1 * sRotateX * myLook * matProjection;
+            cbuffer1.Rotatation = sRotateX * sRotate1;
             cbuffer1.Final = screenFinal;
             int size = Marshal.SizeOf(typeof(CBUFFER));
             var update = new DataStream(size, true, true);
@@ -706,6 +968,41 @@ namespace Start_Screen_Graphical
         /// <param name="device"></param>
         /// <param name="context"></param>
         /// <param name="resourceView1"></param>
+        public void drawAlert(DeviceContext context, List<ShaderResourceView> resourceView1)
+        {
+            //position the alert in the window first.. it will be fixed anyways
+            updateAlert(context, 1.23f, 0.785f, 1.333f, -3.0f, 1.0f, -3.4f, -3.5f, -2.9f);
+
+            if (can_swipe)
+            {
+                device.ImmediateContext.PixelShader.SetShaderResource(resourceView1[0], 0);
+            }
+            //stop
+            if (!can_swipe)
+            {
+                device.ImmediateContext.PixelShader.SetShaderResource(resourceView1[1], 0);
+            }
+            context.InputAssembler.SetVertexBuffers(0, new VertexBufferBinding(Alert, 32, 0));
+            context.InputAssembler.SetIndexBuffer(alertIndexBuffer, Format.R32_UInt, 0);
+            context.DrawIndexed(6, 0, 0);
+        }
+        /// <summary>
+        /// Draws the Skeleton Stream
+        /// </summary>
+        /// <param name="context"></param>
+        /// <param name="resourceView1"></param>
+        public void drawSkeletonStream(DeviceContext context, ShaderResourceView skeletonSRV)
+        {
+            //position the alert in the window first.. it will be fixed anyways
+            updateAlert(context, 1.23f, 0.785f, 1.333f, -3.0f, 1.3f, -3.7f, -3.5f, 2.5f);
+            device.ImmediateContext.PixelShader.SetShaderResource(skeletonSRV, 0);
+            context.InputAssembler.SetVertexBuffers(0, new VertexBufferBinding(Alert, 32, 0));
+            context.InputAssembler.SetIndexBuffer(alertIndexBuffer, Format.R32_UInt, 0);
+            context.DrawIndexed(6, 0, 0);
+        }
+
+
+
         private void drawScreen(DeviceContext context, ShaderResourceView resourceView1)
         {
             device.ImmediateContext.PixelShader.SetShaderResource(resourceView1, 0);
@@ -713,7 +1010,6 @@ namespace Start_Screen_Graphical
             context.InputAssembler.SetIndexBuffer(screenIndexBuffer, Format.R32_UInt, 0);
             context.DrawIndexed(6, 0, 0);
         }
-
         private void ReleaseDXResources(object sender, FormClosingEventArgs e)
         {
             constantBuffer.Dispose();
@@ -724,6 +1020,4 @@ namespace Start_Screen_Graphical
         }
     }
 }
-
-
 

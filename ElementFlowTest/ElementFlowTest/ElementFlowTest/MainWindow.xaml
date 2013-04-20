@@ -1,0 +1,14 @@
+﻿<Window x:Class="ElementFlowTest.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="MainWindow" Height="350" Width="525"
+		xmlns:pageTransitions="clr-namespace:WpfPageTransitions;assembly=WpfPageTransitions"
+		xmlns:local="clr-namespace:ElementFlowTest"
+		WindowState="Maximized">
+
+    <Grid>
+        
+        <pageTransitions:PageTransition Name="pageTransitionControl" TransitionType="Slide" Background="Black"/>
+        
+    </Grid>
+</Window>

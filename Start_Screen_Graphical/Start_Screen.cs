@@ -16,6 +16,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using Events;
+using System.Threading;
 
 namespace Start_Screen_Graphical
 {
@@ -54,6 +55,8 @@ namespace Start_Screen_Graphical
         /// <param name="form"></param>
         public void initializeScene(Form form)
         {
+            
+
             DeviceContext context = device.ImmediateContext;
             scene = new Scene(device, form, context);
             scene.press_pause += new PauseEvent(pauseScreen);
@@ -96,8 +99,8 @@ namespace Start_Screen_Graphical
             context.Rasterizer.SetViewports(viewport);
         }
         public void RenderFrame()
-        {
-
+        {   
+            Thread.Sleep(17);
 
             if (pause == false)
             {
