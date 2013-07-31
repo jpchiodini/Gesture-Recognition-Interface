@@ -4,7 +4,10 @@ using System.Linq;
 using System.Text;
 using Events;
 using Chomp;
+<<<<<<< HEAD
 using cameraTest_1;
+=======
+>>>>>>> 4b3e4cb880c4384ca3451a07175b67692ddbcc22
 
 
 namespace Start_Screen_Graphical
@@ -42,6 +45,7 @@ namespace Start_Screen_Graphical
                 case 0:
                     //test_form testform = new test_form(screen,gesteng);
                     //initialize events
+<<<<<<< HEAD
                     //testform.press_pause += new PauseEvent(pauseScreen);
                     //testform.change_face += new ChangeFace(changeFace);
                     //frmScreen formScreen = new frmScreen();
@@ -50,6 +54,13 @@ namespace Start_Screen_Graphical
                   
                     var wpfWindow = new ElementFlowTest.MainWindow();
                     wpfWindow.Show();
+=======
+                    testform.press_pause += new PauseEvent(pauseScreen);
+                    testform.change_face += new ChangeFace(changeFace);
+                    frmScreen formScreen = new frmScreen();
+                    formScreen.ShowDialog();
+                    //testform.ShowDialog();
+>>>>>>> 4b3e4cb880c4384ca3451a07175b67692ddbcc22
                     break;
                 case 1:
                     //test_form_2 testform_2 = new test_form_2(screen,gesteng);

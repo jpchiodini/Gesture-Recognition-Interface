@@ -117,11 +117,20 @@ namespace Start_Screen_Graphical
         public static float width = 0.35f;
         public static float width1;
         public bool zoom = true;
+<<<<<<< HEAD
         public bool screened = false;
         public bool can_swipe = true;
         public bool signed_in = false;
         bool lock_screen = false;
         bool initial_lock = false;
+=======
+        //moing screen for demo purposes
+        public bool screened = false;
+
+        //##############
+        //Other Variables
+        //##############
+>>>>>>> 4b3e4cb880c4384ca3451a07175b67692ddbcc22
         int currentFace = 0;
         //Default gesture
         int currentGesture = 10;
@@ -601,6 +610,7 @@ namespace Start_Screen_Graphical
             //if right gesture
             if (currentGesture == 0 && signed_in == true)
             {
+<<<<<<< HEAD
                 screened = true;
                 //position alerts                    
                 drawAlert(context, SRVAlertlist);
@@ -615,11 +625,23 @@ namespace Start_Screen_Graphical
                 //position alerts                    
                 drawAlert(context, SRVAlertlist);
                 positionCube(context, Time, 3.14f);
+=======
+                if (Cap1 > -2.0f && screened == false)
+                {
+                    positionCube(context, 1.0f, 3.14f);
+                }
+                else
+                {
+                    screened = true;
+                    positionCube(context, Time, 3.14f);
+                }
+>>>>>>> 4b3e4cb880c4384ca3451a07175b67692ddbcc22
             }
 
             //if zoomed is called
             if (currentGesture == 2 && signed_in == true)
             {
+                
                 //test to see how cube will face up
                 zoomCube(context, 0.8f);
             }
@@ -636,6 +658,7 @@ namespace Start_Screen_Graphical
             {
                 if (screened == false)
                 {
+<<<<<<< HEAD
                     signed_in = true;
                     //make the screen shrink
                     initial_lock = true;
@@ -646,9 +669,17 @@ namespace Start_Screen_Graphical
                 }
                 Cap += 0.005f;
                 Cap1 -= 0.05f;
+=======
+                    //shift screen to start with
+                    updateScreen(context, 0.0f, 0.0f, 1.333f, 0.59f, 1.0f);
+                    drawScreen(context, SRVscreen);
+                }
+
+>>>>>>> 4b3e4cb880c4384ca3451a07175b67692ddbcc22
             }
             else if (Cap < 0.5f)
             {
+<<<<<<< HEAD
                 updateScreen(context, 1.23f, 0.785f, 1.333f, 0.59f, 1.0f);
                 drawScreen(context, SRVscreen);
             }
@@ -656,6 +687,15 @@ namespace Start_Screen_Graphical
             {
                 initial_lock = false;
                 screened = true;
+=======
+                if (screened == false)
+                {
+                    updateScreen(context, 1.23f, 0.785f, 1.333f, Cap1, 1.0f);
+                    drawScreen(context, SRVscreen);
+                }
+                Cap += 0.0001f;
+                Cap1 -= 0.001f;
+>>>>>>> 4b3e4cb880c4384ca3451a07175b67692ddbcc22
             }
 
             //set the cubes rotating position                    
@@ -780,7 +820,7 @@ namespace Start_Screen_Graphical
         /// <param name="scaleZ">change cube size in Z</param>
         private void positionCube(DeviceContext context, float y, float x)
         {
-
+            
             mRotateY = Matrix.RotationY(y);
             mRotateX = Matrix.RotationX(x);
 
